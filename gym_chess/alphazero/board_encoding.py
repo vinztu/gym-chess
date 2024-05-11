@@ -148,8 +148,8 @@ class BoardEncoding(gym.ObservationWrapper):
         package to create a chess.Board(fen = FEN)
         """
         
-        piece_types_conversion = {0: "P", 1: "N", 2: "B", 3: "R": 4: "Q", 5: "K",     # White
-                                  6: "p", 7: "n", 8: "b", 9: "r": 10: "q", 11: "k"}   # Black
+        piece_types_conversion = {0: "P", 1: "N", 2: "B", 3: "R", 4: "Q", 5: "K",     # White
+                                  6: "p", 7: "n", 8: "b", 9: "r", 10: "q", 11: "k"}   # Black
         
         history = self._history.view(orientation = chess.WHITE)
         
