@@ -46,7 +46,7 @@ class BoardEncoding(gym.ObservationWrapper):
         Note: Not all possible instances of this observation space encode legal 
         board positions. It is thus not advised to use 
         env.observation_space.sample() to generate board positions.
-    """    
+    """
 
     # TODO how to type env correctly?
     def __init__(self, env, history_length: int = 8) -> None:
@@ -67,7 +67,7 @@ class BoardEncoding(gym.ObservationWrapper):
 
         self._history.reset()
         return super(BoardEncoding, self).reset(**kwargs)
-
+        
 
     def observation(self, board: chess.Board) -> np.array:
         """Converts chess.Board observations instance to numpy arrays.
@@ -109,13 +109,12 @@ class BoardEncoding(gym.ObservationWrapper):
         observation = np.concatenate([history, meta], axis=-1)
         return observation
     
-    def get_observation(self) -> np.array:
+    def get_observation(self, board: chess.Board) -> np.array:
         """Converts chess.Board observations instance to numpy arrays.
         
         Note: 
             Use this instead of observation() to get the current observation.
         """
-        board = self.env._board
         history = self._history.view(orientation=board.turn)
         
         meta = np.zeros(
@@ -142,7 +141,72 @@ class BoardEncoding(gym.ObservationWrapper):
 
         observation = np.concatenate([history, meta], axis=-1)
         return observation
-
+    
+    
+    def observation_decoding(self) -> str:
+        """Converts observation into a FEN string that can be used with the chess
+        package to create a chess.Board(fen = FEN)
+        """
+        
+        piece_types_conversion = {0: "P", 1: "N", 2: "B", 3: "R": 4: "Q", 5: "K",     # White
+                                  6: "p", 7: "n", 8: "b", 9: "r": 10: "q", 11: "k"}   # Black
+        
+        history = self._history.view(orientation = chess.WHITE)
+        
+        FEN = ""
+        
+        # only the first 14 channels / planes are relevant for the current piece position
+        piece_rows, piece_columns, piece_types = np.nonzero(history[:, :, 0:15])
+        
+        # last file where we placed a piece
+        last_piece_file = -1
+        
+        for rank, file, piece_type in zip(piece_rows, piece_columns, piece_types):
+            piece_gap_int = file - last_piece_file - 1
+            piece_gap = str(piece_gap_int) if piece_gap_int != 0 else ""
+            
+            
+            FEN.append(piece_gap + piece_types_conversion[piece_types])
+            
+            last_piece_file = file
+            
+        
+        
+        # add the turn information
+        board_turn = history[0,0,111]
+        FEN.append(" " + board_turn + " ")
+        
+        if board_turn:
+            white_kingside_castling_rights = "K" if history[0,0,113] else ""
+            white_queenside_castling_rights = "Q" if history[0,0,114] else ""
+            
+            black_kingside_castling_rights = "k" if history[0,0,115] else ""
+            black_queenside_castling_rights = "q" if history[0,0,116] else ""
+            
+        else:
+            black_kingside_castling_rights = "k" if history[0,0,113] else ""
+            black_queenside_castling_rights = "q" if history[0,0,114] else ""
+            
+            white_kingside_castling_rights = "K" if history[0,0,115] else ""
+            white_queenside_castling_rights = "Q" if history[0,0,116] else ""
+            
+        
+        FEN.append(white_kingside_castling_rights + white_queenside_castling_rights + black_kingside_castling_rights + black_queenside_castling_rights)
+            
+        # assume no en-passant move
+        en_passant = "-"
+        FEN.append(" " + en_passant + " ")
+        
+        fullmove_number = history[0,0,112]
+        halfmove_number = history[0,0,117]
+        FEN.append(halfmove_number + " " + fullmove_number )
+        
+        return FEN
+    
+    def board_encoding(self, FEN: str) -> np.array:
+        board = chess.Board(fen = FEN)
+        return self.get_observation(board)
+    
 
 class BoardHistory:
     """Maintains a history of recent board positions, encoded as numpy arrays.
